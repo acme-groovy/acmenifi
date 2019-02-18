@@ -21,7 +21,7 @@ package groovyx.acme.nifi
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 
-class AcmeNIFITest extends GroovyTestCase {
+class AcmeNiFiTest extends GroovyTestCase {
 	public void testJson(){
         def w,o
 		def s = '{"a":{"b":[1,2,3,"xx"]},"C":"qwerty",'+((33..11).collect{'"aaa'+it+'":'+it}.join(','))+'}';
@@ -37,7 +37,7 @@ class AcmeNIFITest extends GroovyTestCase {
     public void testAcmeWritable1(){
         def s = "привет"
         def b = new ByteArrayOutputStream()
-        def w = AcmeNIFI.asStream{OutputStream out->
+        def w = AcmeNiFi.asStream{OutputStream out->
             out.write(s.getBytes("UTF-8"))
         }
         w.process(b)
@@ -48,7 +48,7 @@ class AcmeNIFITest extends GroovyTestCase {
     public void testAcmeWritable2(){
         def s = "привет"
         def b = new ByteArrayOutputStream()
-        def w = AcmeNIFI.asWriter("UTF-8"){out->
+        def w = AcmeNiFi.asWriter("UTF-8"){out->
             assert out instanceof Writer
             out.write(s)
         }

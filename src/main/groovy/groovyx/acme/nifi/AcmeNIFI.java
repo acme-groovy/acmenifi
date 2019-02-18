@@ -29,8 +29,7 @@ import java.io.Writer;
  * nifi helpers
  * by dlukyanov@ukr.net 
  */
-@groovy.transform.CompileStatic
-public class AcmeNIFI{
+public class AcmeNiFi{
 
 	public static FlowFileWorker withFlowFile(Script script){
 		return new FlowFileWorker(script,false);
