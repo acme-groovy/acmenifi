@@ -1,0 +1,120 @@
+/* GRADLE  */
+//apply plugin: "groovy"
+//apply plugin: "maven"
+//apply plugin: "maven-publish"
+
+plugins {
+	id "maven"
+	id "maven-publish"
+	id "groovy"
+    id "com.jfrog.bintray" version "1.8.0"
+}
+
+repositories {
+    jcenter()
+}
+
+//============================================
+group = "acme.groovy"
+version = new Date().format("yyyyMMdd")
+
+sourceCompatibility = 1.7
+targetCompatibility = 1.7
+//============================================
+
+//load / create default props
+new File("local.properties").with{f->
+	new Properties().with{p->
+		if(f.exists()){
+			println "load $f"
+			p.load(f.newInputStream())
+		}else{
+			println "create $f"
+			p.brKey="bintray api key"
+			p.brUser="bintray user"
+			p.store(f.newOutputStream(), "private system properties")
+		}
+		System.getProperties().putAll(p)
+	}
+}
+
+dependencies {
+	compileOnly (
+		[group: "org.codehaus.groovy",   name: "groovy-all",   version: "2.4.12"],
+		[group: "org.apache.nifi",       name: "nifi-api",     version: "1.7.1"],
+	)
+	testCompile (
+		[group: "org.codehaus.groovy",   name: "groovy-all",   version: "2.4.12"],
+		[group: "org.apache.nifi",       name: "nifi-api",     version: "1.7.1"],
+		[group: "junit",                 name: "junit",        version: "4.11"],
+	)
+}
+
+
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = "sources"
+    from sourceSets.main.allSource
+}
+
+task groovydocJar(type: Jar, dependsOn: groovydoc) {
+    classifier = "groovydoc"
+    from groovydoc.destinationDir
+}
+
+publishing {
+    publications {
+        MyPublication(MavenPublication) {
+            from components.java
+            artifact sourcesJar
+            artifact groovydocJar
+        }
+    }
+}
+
+bintray {
+    user = System.getProperty("brUser") ?: "use `-DbrKey=...` parameter"
+    key  = System.getProperty("brKey")  ?: "use `-DbrUser=...` parameter"
+    publications = ["MyPublication"]
+    pkg {
+        repo     = "repo"
+        name     = rootProject.name
+        userOrg  = rootProject.group.tr('.','-')
+        licenses = ["Apache-2.0"]
+        vcsUrl   = "https://github.com/acme-groovy/acmenifi.git"
+		publicDownloadNumbers = true
+		/*
+		version {
+			name = version
+			desc = "plain http client optimized for groovy language"
+			released  = new Date()
+		}
+		*/
+    }
+}
+
+jar {
+	manifest {
+		attributes(
+			//"Created-By"            : vendor,
+			"Implementation-Title"  : "${rootProject.group}:${rootProject.name}",
+			"Implementation-Version": "${rootProject.version}",
+			"Implementation-URL"    : "https://github.com/acme-groovy/acmenifi",
+		)
+	}
+}
+
+task all(dependsOn: [clean, build, groovydocJar, sourcesJar, bintrayUpload]){
+	build.mustRunAfter clean
+	groovydocJar.mustRunAfter build
+	sourcesJar.mustRunAfter groovydocJar
+	bintrayUpload.mustRunAfter sourcesJar
+}
+
+allprojects {
+	gradle.projectsEvaluated {
+		tasks.withType(GroovyCompile) {
+			options.compilerArgs << "-Xlint:unchecked"
+		}
+	}
+}
