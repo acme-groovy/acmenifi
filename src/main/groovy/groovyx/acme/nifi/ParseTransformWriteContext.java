@@ -44,7 +44,12 @@ abstract class ParseTransformWriteContext implements Runnable{
     /** must parse input stream and return parsed object*/
     abstract Object parse(InputStream in) throws Exception;
     /**called before writing data returned after transformer to convert it to a writable object*/
-    abstract AcmeWritable writable(Object data);
+    AcmeWritable writable(Object data){
+		throw new RuntimeException("Only `asWriter{}` or `asStream{}` are supported as return value. got: "+data.getClass());
+    }
+	
+	/**finalize context. override it and it will be called just before file transfer or drop.*/
+	void finit(){}
 
     @Override
     public void run(){
@@ -54,11 +59,15 @@ abstract class ParseTransformWriteContext implements Runnable{
         Object data = null;
 
         try(InputStream sin = session.read(flowFile)) {
-            data = parse(sin);
+        	if(flowFile.size()>0){
+        		//we don't call `parse` for an empty content. and data remains null.
+	            data = parse(sin);
+	        }
         }catch(Exception e){
             throw new RuntimeException(e.toString(),e);
         }
 
+       	//transformer 
         if( this.transformArgCount==1 ){
             data = transform.call(data);
         }else{
@@ -67,13 +76,14 @@ abstract class ParseTransformWriteContext implements Runnable{
         }
 
         if(data==null){
+			finit()
             session.remove(flowFile);
         }else{
             AcmeWritable writable = null;
             if(data instanceof AcmeWritable)writable=(AcmeWritable)data;
             else writable = writable(data);
 
-            flowFile = session.write(flowFile,writable); //calls this.process(OutputStream out){} method
+            flowFile = session.write(flowFile,writable); //calls writable.process(OutputStream out) method
             if(attr!=null){
                 //update attributes.
                 Set<String> removed = attr.getRemovedKeys();
@@ -83,6 +93,7 @@ abstract class ParseTransformWriteContext implements Runnable{
                     if(value!=null)flowFile = session.putAttribute(flowFile, key, value.toString());
                 }
             }
+			finit()
             session.transfer(flowFile,REL_SUCCESS);
         }
 

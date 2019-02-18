@@ -40,11 +40,11 @@ public class FlowFileWorker {
     }
 
     @SuppressWarnings("unchecked")
-    public void asJson(Closure transform) {
-        asJson(Collections.EMPTY_MAP, transform);
+    public void withJson(Closure transform) {
+        withJson(Collections.EMPTY_MAP, transform);
     }
 
-    public void asJson(final Map<String,Object> parms, Closure transform){
+    public void withJson(final Map<String,Object> parms, Closure transform){
         new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){
             final String encoding = (String)parms.getOrDefault("encoding","UTF-8");
             final Boolean indent = (Boolean)parms.getOrDefault("indent", Boolean.FALSE);
@@ -66,7 +66,7 @@ public class FlowFileWorker {
         }.run();
     }
 
-    public void asXml(Closure transform){
+    public void withXml(Closure transform){
         new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){
             @Override Object parse(InputStream in) throws Exception {
                 return new XmlSlurper().parse(in);
@@ -88,6 +88,43 @@ public class FlowFileWorker {
                         }
                     };
                 throw new RuntimeException("Unsupported writable object: "+o.getClass()+". Expected: GPathResult or groovy.util.Node");
+            }
+        }.run();
+    }
+	
+    @SuppressWarnings("unchecked")
+    public void withReader(Closure transform){
+		withReader(Collections.EMPTY_MAP, transform);
+	}
+	
+    public void withReader(final Map<String,Object> parms, Closure transform){
+        new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){
+            final String encoding = (String)parms.getOrDefault("encoding","UTF-8");
+			final Reader reader;
+            @Override
+            Object parse(InputStream in) throws Exception {
+                reader = BufferedReader(new InputStreamReader(in, encoding)));
+				return reader;
+            }
+            @Override
+            void finit() {
+				IOUtils.closeQuitely(reader);
+            }
+        }.run();
+    }
+	
+    public void withStream(Closure transform){
+        new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){
+            final String encoding = (String)parms.getOrDefault("encoding","UTF-8");
+			final InputStream stream;
+            @Override
+            Object parse(InputStream in) throws Exception {
+                stream = in;
+				return stream;
+            }
+            @Override
+            void finit() {
+				IOUtils.closeQuitely(stream);
             }
         }.run();
     }
