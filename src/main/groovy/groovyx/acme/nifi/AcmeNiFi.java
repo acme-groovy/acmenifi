@@ -21,9 +21,12 @@ package groovyx.acme.nifi;
 
 import groovy.lang.Closure;
 import groovy.lang.Script;
+import groovy.text.Template;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Writer;
+import java.util.Map;
 
 /**
  * nifi helpers
@@ -71,4 +74,18 @@ public class AcmeNiFi{
         };
 	}
 
+    /** helper to return alternate serializer based on GSP-like template.
+     * <code>return asTemplate([var_json:json], 'value from json: <%= var_json.key1.key2 %>' )</code>
+     * */
+	public static AcmeWritable asTemplate(final Map<String,Object> args, final String template){
+	    String encoding = (String)args.getOrDefault("encoding", "UTF-8");
+        return new AcmeWritable(encoding){
+            @Override
+            protected Writer writeTo(Writer out) throws IOException {
+                Template t = Templates.get(template);
+                t.make(args).writeTo(out);
+                return out;
+            }
+        };
+	}
 }

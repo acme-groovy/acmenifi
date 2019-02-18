@@ -57,5 +57,14 @@ class AcmeNiFiTest extends GroovyTestCase {
         assert b.toString("UTF-8")==s
 
     }
+    public void testAcmeTemplate(){
+        def b = new ByteArrayOutputStream()
+        def w = AcmeNiFi.asTemplate([name:'мир'],'привет <%= name %>')
+        w.process(b)
+        println b.toString("UTF-8")
+        assert b.toString("UTF-8")=='привет мир';
+        //println b.toString("UTF-8")
+
+    }
 	public void testFakeMethod(){}
 }

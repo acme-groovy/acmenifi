@@ -7,7 +7,7 @@ plugins {
 	id "maven"
 	id "maven-publish"
 	id "groovy"
-    id "com.jfrog.bintray" version "1.8.0"
+    id "com.jfrog.bintray" version "1.8.4"
 }
 
 repositories {
@@ -39,6 +39,9 @@ new File("local.properties").with{f->
 }
 
 dependencies {
+	compile(
+		[group: "acme.groovy",           name: "acmetemplate", version: "20190218"],
+	)
 	compileOnly (
 		[group: "org.codehaus.groovy",   name: "groovy-all",   version: "2.4.12"],
 		[group: "org.apache.nifi",       name: "nifi-api",     version: "1.7.1"],
