@@ -59,7 +59,7 @@ abstract class ParseTransformWriteContext implements Runnable{
         Object data = null;
 
         try(InputStream sin = session.read(flowFile)) {
-        	if(flowFile.size()>0){
+        	if(flowFile.getSize()>0){
         		//we don't call `parse` for an empty content. and data remains null.
 	            data = parse(sin);
 	        }
@@ -76,7 +76,7 @@ abstract class ParseTransformWriteContext implements Runnable{
         }
 
         if(data==null){
-			finit()
+			finit();
             session.remove(flowFile);
         }else{
             AcmeWritable writable = null;
@@ -93,7 +93,7 @@ abstract class ParseTransformWriteContext implements Runnable{
                     if(value!=null)flowFile = session.putAttribute(flowFile, key, value.toString());
                 }
             }
-			finit()
+			finit();
             session.transfer(flowFile,REL_SUCCESS);
         }
 

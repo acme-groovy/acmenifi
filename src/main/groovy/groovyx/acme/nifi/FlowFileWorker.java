@@ -7,10 +7,11 @@ import groovy.util.Node;
 import groovy.util.XmlSlurper;
 import groovy.util.slurpersupport.GPathResult;
 import groovy.xml.XmlUtil;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.InputStreamReader;
+import java.io.BufferedReader;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
@@ -100,23 +101,22 @@ public class FlowFileWorker {
     public void withReader(final Map<String,Object> parms, Closure transform){
         new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){
             final String encoding = (String)parms.getOrDefault("encoding","UTF-8");
-			final Reader reader;
+			Reader reader;
             @Override
             Object parse(InputStream in) throws Exception {
-                reader = BufferedReader(new InputStreamReader(in, encoding)));
+                reader = new BufferedReader(new InputStreamReader(in, encoding));
 				return reader;
             }
             @Override
             void finit() {
-				IOUtils.closeQuitely(reader);
+				IOUtils.closeQuietly(reader);
             }
         }.run();
     }
 	
     public void withStream(Closure transform){
         new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){
-            final String encoding = (String)parms.getOrDefault("encoding","UTF-8");
-			final InputStream stream;
+			InputStream stream;
             @Override
             Object parse(InputStream in) throws Exception {
                 stream = in;
@@ -124,7 +124,7 @@ public class FlowFileWorker {
             }
             @Override
             void finit() {
-				IOUtils.closeQuitely(stream);
+				IOUtils.closeQuietly(stream);
             }
         }.run();
     }
