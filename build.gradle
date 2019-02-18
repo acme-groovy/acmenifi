@@ -39,9 +39,11 @@ new File("local.properties").with{f->
 }
 
 dependencies {
+	/*
 	compile(
 		[group: "acme.groovy",           name: "acmetemplate", version: "20190218"],
 	)
+	*/
 	compileOnly (
 		[group: "org.codehaus.groovy",   name: "groovy-all",   version: "2.4.12"],
 		[group: "org.apache.nifi",       name: "nifi-api",     version: "1.7.1"],

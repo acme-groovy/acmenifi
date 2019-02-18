@@ -77,6 +77,7 @@ public class AcmeNiFi{
     /** helper to return alternate serializer based on GSP-like template.
      * <code>return asTemplate([var_json:json], 'value from json: <%= var_json.key1.key2 %>' )</code>
      * */
+    /*
 	public static AcmeWritable asTemplate(final Map<String,Object> args, final String template){
 	    String encoding = (String)args.getOrDefault("encoding", "UTF-8");
         return new AcmeWritable(encoding){
@@ -88,4 +89,5 @@ public class AcmeNiFi{
             }
         };
 	}
+	*/
 }
