@@ -113,6 +113,38 @@ public class FlowFileWorker {
             }
         }.run();
     }
+
+    public void withReadWriter(final Map<String,Object> parms, Closure rw){
+        final String encoding = (String)parms.getOrDefault("encoding","UTF-8");
+        Closure transform=new Closure(null){
+            public Object doCall(Reader r, Map attr){
+                return new AcmeWritable(encoding){
+                    @Override
+                    protected Writer writeTo(Writer w)throws IOException {
+                        if(rw.getMaximumNumberOfParameters()==2) {
+                            rw.call(r, w);
+                        }else{
+                            rw.call(r, w, attr);
+                        }
+                        return w;
+                    }
+                };
+            }
+        };
+        new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){
+			Reader reader;
+            @Override
+            Object parse(InputStream in) throws Exception {
+                reader = new BufferedReader(new InputStreamReader(in, encoding));
+				return reader;
+            }
+            @Override
+            void finit() {
+				IOUtils.closeQuietly(reader);
+            }
+        }.run();
+    }
+
 	
     public void withStream(Closure transform){
         new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){

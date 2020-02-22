@@ -53,7 +53,7 @@ class AcmeNiFiTest extends GroovyTestCase {
             out.write(s)
         }
         w.process(b)
-        println b.toString("UTF-8")
+        //println b.toString("UTF-8")
         assert b.toString("UTF-8")==s
 
     }
@@ -61,7 +61,7 @@ class AcmeNiFiTest extends GroovyTestCase {
         def b = new ByteArrayOutputStream()
         def w = AcmeNiFi.asTemplate([name:'мир'],'привет <%= name %>')
         w.process(b)
-        println b.toString("UTF-8")
+        //println b.toString("UTF-8")
         assert b.toString("UTF-8")=='привет мир';
         //println b.toString("UTF-8")
 

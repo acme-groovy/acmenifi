@@ -16,6 +16,7 @@ import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.io.OutputStreamCallback;
+import org.apache.nifi.processor.io.StreamCallback;
 import org.w3c.dom.Element;
 
 /**
@@ -44,7 +45,7 @@ abstract class ParseTransformWriteContext implements Runnable{
     /** must parse input stream and return parsed object*/
     abstract Object parse(InputStream in) throws Exception;
     /**called before writing data returned after transformer to convert it to a writable object*/
-    AcmeWritable writable(Object data){
+    AcmeWritable _writable(Object data){
 		throw new RuntimeException("Only `asWriter{}` or `asStream{}` are supported as return value. got: "+data.getClass());
     }
 	
@@ -55,45 +56,52 @@ abstract class ParseTransformWriteContext implements Runnable{
     public void run(){
         if(flowFile==null)return;
 
-        ControlMap attr = null;
-        Object data = null;
+        final ControlMap attr = new ControlMap(flowFile.getAttributes());
+        final Object[] data = new Object[1];
 
-        try(InputStream sin = session.read(flowFile)) {
-        	if(flowFile.getSize()>0){
-        		//we don't call `parse` for an empty content. and data remains null.
-	            data = parse(sin);
-	        }
-        }catch(Exception e){
-            throw new RuntimeException(e.toString(),e);
+        flowFile = session.write(flowFile, new StreamCallback() {
+            @Override
+            public void process(InputStream sin, OutputStream sout) throws IOException {
+                //read & parse
+                //Object data = null;
+                if(flowFile.getSize()>0){
+                    //we don't call `parse` for an empty content. and data remains null.
+                    try {
+                        data[0] = parse(sin);
+                    }catch(Throwable t){
+                        throw new IOException(t.getMessage(), t);
+                    }
+                }
+                //transform
+                if( transformArgCount==1 ){
+                    data[0] = transform.call(data[0]);
+                }else{
+                    data[0] = transform.call(data[0],attr);
+                }
+                //write
+                if(data[0]!=null){
+                    //got some data to write
+                    AcmeWritable writable = data[0] instanceof AcmeWritable ? (AcmeWritable)data[0] : _writable(data[0]);
+                    writable.writeTo( sout );
+                }
+
+            }
+        });
+
+        //update attributes.
+        Set<String> removed = attr.getRemovedKeys();
+        if(removed.size()>0)flowFile = session.removeAllAttributes(flowFile,removed);
+        for(String key: attr.getModifiedKeys()){
+            Object value = attr.get(key);
+            if(value!=null)flowFile = session.putAttribute(flowFile, key, value.toString());
         }
-
-       	//transformer 
-        if( this.transformArgCount==1 ){
-            data = transform.call(data);
-        }else{
-            attr = new ControlMap(flowFile.getAttributes());
-            data = transform.call(data,attr);
-        }
-
-        if(data==null){
-			finit();
+        //finalize
+        finit();
+        // drop or transfer
+        if(data[0]==null){
+            //if no data to write - just drop the file
             session.remove(flowFile);
         }else{
-            AcmeWritable writable = null;
-            if(data instanceof AcmeWritable)writable=(AcmeWritable)data;
-            else writable = writable(data);
-
-            flowFile = session.write(flowFile,writable); //calls writable.process(OutputStream out) method
-            if(attr!=null){
-                //update attributes.
-                Set<String> removed = attr.getRemovedKeys();
-                if(removed.size()>0)flowFile = session.removeAllAttributes(flowFile,removed);
-                for(String key: attr.getModifiedKeys()){
-                    Object value = attr.get(key);
-                    if(value!=null)flowFile = session.putAttribute(flowFile, key, value.toString());
-                }
-            }
-			finit();
             session.transfer(flowFile,REL_SUCCESS);
         }
 
