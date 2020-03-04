@@ -25,14 +25,10 @@ class AcmeNiFiTest extends GroovyTestCase {
 	public void testJson(){
         def w,o
 		def s = '{"a":{"b":[1,2,3,"xx"]},"C":"qwerty",'+((33..11).collect{'"aaa'+it+'":'+it}.join(','))+'}';
-		//println s
-        //def o=new AcmeJsonSlurper().parseText(s);
-        //println o
         o=new JsonSlurper().parseText(s);
         w=new StringWriter()
         AcmeJsonOutput.writeJson(o,w,-1)
         assert w.toString()==JsonOutput.toJson(o)
-        //println w
 	}
     public void testAcmeWritable1(){
         def s = "привет"
@@ -40,9 +36,8 @@ class AcmeNiFiTest extends GroovyTestCase {
         def w = AcmeNiFi.asStream{OutputStream out->
             out.write(s.getBytes("UTF-8"))
         }
-        w.process(b)
+        w.streamTo(b)
         assert b.toString("UTF-8")==s
-        //println b.toString("UTF-8")
 
     }
     public void testAcmeWritable2(){
@@ -52,19 +47,15 @@ class AcmeNiFiTest extends GroovyTestCase {
             assert out instanceof Writer
             out.write(s)
         }
-        w.process(b)
-        //println b.toString("UTF-8")
+        w.streamTo(b)
         assert b.toString("UTF-8")==s
 
     }
     public void testAcmeTemplate(){
         def b = new ByteArrayOutputStream()
         def w = AcmeNiFi.asTemplate([name:'мир'],'привет <%= name %>')
-        w.process(b)
-        //println b.toString("UTF-8")
+        w.streamTo(b)
         assert b.toString("UTF-8")=='привет мир';
-        //println b.toString("UTF-8")
-
     }
 	public void testFakeMethod(){}
 }

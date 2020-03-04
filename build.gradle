@@ -18,8 +18,10 @@ repositories {
 group = "acme.groovy"
 version = new Date().format("yyyyMMdd")
 
-sourceCompatibility = 1.7
-targetCompatibility = 1.7
+String nifi_version = "1.7.1"
+
+//sourceCompatibility = 1.7
+//targetCompatibility = 1.7
 //============================================
 
 //load / create default props
@@ -44,12 +46,14 @@ dependencies {
 	)
 	compileOnly (
 		[group: "org.codehaus.groovy",   name: "groovy-all",   version: "2.4.12"],
-		[group: "org.apache.nifi",       name: "nifi-api",     version: "1.7.1"],
+		[group: "org.apache.nifi",       name: "nifi-api",     version: nifi_version],
 	)
 	testCompile (
 		[group: "org.codehaus.groovy",   name: "groovy-all",   version: "2.4.12"],
 		[group: "org.apache.nifi",       name: "nifi-api",     version: "1.7.1"],
 		[group: "junit",                 name: "junit",        version: "4.11"],
+		[group: "org.apache.nifi",       name: "nifi-mock",    version: nifi_version],
+		[group: "org.apache.nifi",       name: "nifi-groovyx-processors",version: nifi_version],
 	)
 }
 
