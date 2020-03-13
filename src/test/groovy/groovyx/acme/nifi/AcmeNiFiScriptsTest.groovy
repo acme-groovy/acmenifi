@@ -92,16 +92,13 @@ class AcmeNiFiScriptsTest extends GroovyTestCase {
                 }
             }
             //validate attributes
-            println "---attributes---"
             results = parms.findAll {k,v->k.startsWith("attributes")}
-            println "$results"
             if(results.size()>0){
                 assert success.size()==results.size()
                 results.eachWithIndex{ key,attrDef, int i ->
                     Properties attributes = new ConfigSlurper().parse(attrDef).toProperties()
                     attributes.each {k,v->
                         success.get(0).assertAttributeEquals((String)k, (String)v)
-                        println "attribute validated: $k = $v"
                     }
                 }
             }

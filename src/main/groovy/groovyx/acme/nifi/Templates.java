@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.WeakHashMap;
 
 public class Templates {
+    //normally there should not be a lot of templates. let's do simple cache.
     private static WeakHashMap<String, Template> cache = new WeakHashMap<>();
 
     public static Template get(String template) throws IOException {

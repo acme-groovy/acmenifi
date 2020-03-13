@@ -2,10 +2,14 @@ package groovyx.acme.nifi;
 
 import java.io.*;
 //import java.util.Map;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 
 import groovy.lang.Closure;
 import groovy.lang.Writable;
+import groovy.text.Template;
+import org.apache.nifi.components.PropertyValue;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
@@ -15,6 +19,7 @@ import org.apache.nifi.processor.io.StreamCallback;
  * Created by dm on 16.02.2019.
  */
 class ParseTransformWriteContext implements Runnable, StreamCallback{
+    private TransformDelegate transformDelegate = new TransformDelegate();
     /*must be assigned in constructor*/
     protected Closure transform;
     protected FlowFile flowFile;
@@ -56,9 +61,9 @@ class ParseTransformWriteContext implements Runnable, StreamCallback{
     Object transform(Object data, ControlMap attr) throws Exception{
         if(transform!=null) {
             if (transform.getMaximumNumberOfParameters() == 1) {
-                data = transform.call(data);
+                data = delegated(transform).call(data);
             } else {
-                data = transform.call(data,attr);
+                data = delegated(transform).call(data,attr);
             }
         }
         return data;
@@ -66,8 +71,19 @@ class ParseTransformWriteContext implements Runnable, StreamCallback{
 
     /*calls asWritable(data) and then writes data to the output*/
     void write(Object data, OutputStream out) throws Exception{
-        if(data instanceof InputStream) org.codehaus.groovy.runtime.IOGroovyMethods.leftShift(out, (InputStream)data);
-        else ((StreamWritable)data).streamTo(out);
+        if(data instanceof StreamWritable) ((StreamWritable)data).streamTo(out);
+        else if(data instanceof InputStream) org.codehaus.groovy.runtime.IOGroovyMethods.leftShift(out, (InputStream)data);
+        else if(data instanceof Writable) {
+            try(Writer w=toWriter(out,"UTF-8")){
+                ((Writable)data).writeTo(w);
+                w.flush();
+            }
+        }else if(data instanceof CharSequence){
+            try(Writer w=toWriter(out,"UTF-8")){
+                w.append((CharSequence)data);
+                w.flush();
+            }
+        } else throw new IllegalArgumentException("Unsupported returned value type to write: "+data.getClass());
     }
 
     /**
@@ -147,10 +163,94 @@ class ParseTransformWriteContext implements Runnable, StreamCallback{
 
     }
 
+    /**
+     * sets transformerDelegate for the closure and returns closure
+     */
+    protected Closure delegated(Closure c){
+        c.setDelegate( transformDelegate );
+        return c;
+    }
+
     static Reader toReader(InputStream in, String encoding) throws UnsupportedEncodingException {
         return new BufferedReader(new InputStreamReader(in, encoding));
     }
     static Writer toWriter(OutputStream out, String encoding) throws UnsupportedEncodingException {
         return new BufferedWriter(new OutputStreamWriter(out, encoding));
+    }
+
+    /**
+     * class used as a delegate object for transform closures
+     */
+    class TransformDelegate{
+        /** helper to return alternate serializer of the parsed flowfile object that requires writer.
+         * <code>return asWriter("UTF-8"){out-> out.write(stringContent)}</code>
+         * */
+        public StreamWritable asWriter(Map<String,Object> args, final Closure c){
+            return new StreamWritable(args){
+                @Override
+                protected Writer writeTo(Writer out)throws IOException {
+                    c.call(out);
+                    return out;
+                }
+            };
+        }
+        /** helper to return alternate serializer of the parsed flowfile object that requires writer.
+         * <code>return asWriter{out-> out.write(stringContent)}</code>
+         * */
+        @SuppressWarnings("unchecked")
+        public StreamWritable asWriter(Closure c){
+            return asWriter(Collections.EMPTY_MAP,c);
+        }
+
+        /** helper to return alternate serializer of the parsed flowfile object.
+         * <code>return asStream{out-> out.write(bytesContent)}</code>
+         * */
+        public StreamWritable asStream(final Closure c){
+            return new StreamWritable("stream"){
+                @Override
+                public OutputStream streamTo(OutputStream out)throws IOException{
+                    c.call(out);
+                    return out;
+                }
+            };
+        }
+
+
+
+        /** helper to return alternate serializer based on GSP-like template.
+         * <code>return asTemplate([var_json:json], 'value from json: <%= var_json.key1.key2 %>' )</code>
+         * */
+        public StreamWritable asTemplate(final Map<String,Object> args, final String template){
+            String encoding = (String)args.getOrDefault("encoding", "UTF-8");
+            return new StreamWritable(encoding){
+                @Override
+                protected Writer writeTo(Writer out) throws IOException {
+                    Template t = Templates.get(template);
+                    t.make(args).writeTo(out);
+                    return out;
+                }
+            };
+        }
+
+        public StreamWritable asTemplate(final Map<String,Object> args, final PropertyValue template) {
+            return  asTemplate(args, template.getValue());
+        }
+
+        @SuppressWarnings("unchecked")
+        public FlowFileWorker createFlowFile() {
+            return createFlowFile(Collections.EMPTY_MAP);
+        }
+        /**
+         * creates flowFile from current flow file with cloning only attributes or if `parms.copyContent==true` with cloning attributes and content.
+         * @param parms `cloneContent` if true clones attributes and content of current flow file; otherwise clones only attributes (default=false)
+         * @return new new flow file worker
+         */
+        public FlowFileWorker createFlowFile(final Map<String,Object> parms){
+            Boolean content    = (Boolean)parms.getOrDefault("copyContent", Boolean.FALSE);
+            return new FlowFileWorker(
+                    content?session.clone(flowFile):session.create(flowFile),
+                    session, REL_SUCCESS);
+        }
+
     }
 }

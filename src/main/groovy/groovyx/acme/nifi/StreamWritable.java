@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.util.Map;
+
 import org.apache.nifi.processor.io.OutputStreamCallback;
 
 
@@ -17,6 +19,10 @@ abstract public class StreamWritable { // implements OutputStreamCallback {
 
     StreamWritable(String encoding){
         this.encoding=encoding;
+    }
+
+    StreamWritable(Map<String,Object> args){
+        this.encoding = (String)args.getOrDefault("encoding", "UTF-8");
     }
 
     /** overwrite this method if you need to write to a writer */

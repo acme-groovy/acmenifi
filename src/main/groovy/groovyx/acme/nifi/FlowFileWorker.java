@@ -4,6 +4,7 @@ import groovy.json.JsonParserType;
 import groovy.json.JsonSlurper;
 import groovy.lang.Closure;
 import groovy.lang.Script;
+import groovy.text.Template;
 import groovy.util.Node;
 import groovy.util.XmlParser;
 import groovy.util.XmlSlurper;
@@ -15,8 +16,11 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+
+import org.apache.nifi.components.PropertyValue;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
@@ -45,26 +49,10 @@ public class FlowFileWorker {
         }
     }
 
-    private FlowFileWorker( FlowFile flowFile, ProcessSession session, Relationship REL_SUCCESS){
+    FlowFileWorker( FlowFile flowFile, ProcessSession session, Relationship REL_SUCCESS){
         this.flowFile    = flowFile;
         this.session     = session;
         this.REL_SUCCESS = REL_SUCCESS;
-    }
-
-    @SuppressWarnings("unchecked")
-    public FlowFileWorker cloneFlowFile() {
-        return cloneFlowFile(Collections.EMPTY_MAP);
-    }
-    /**
-     * creates flowFile from current flow file with cloning only attributes or if `parms.content==true` with cloning attributes and content.
-     * @param parms `content` if true clones attributes and content of current flow file; otherwise clones only attributes (default=false)
-     * @return new new flow file worker
-     */
-    public FlowFileWorker cloneFlowFile(final Map<String,Object> parms){
-        Boolean content    = (Boolean)parms.getOrDefault("content",      Boolean.FALSE);
-        return new FlowFileWorker(
-                content?session.clone(this.flowFile):session.create(this.flowFile),
-                session, REL_SUCCESS);
     }
 
     @SuppressWarnings("unchecked")
@@ -95,9 +83,11 @@ public class FlowFileWorker {
             }
             @Override
             void write(Object data, OutputStream out) throws Exception {
-                try( Writer w = toWriter(out, encoding)){
-                    AcmeJsonOutput.writeJson(data,w,indent?0:-1);
-                }
+                if(data instanceof Map || data instanceof Collection || data instanceof CharSequence || data instanceof Boolean || data instanceof Number){
+                    try( Writer w = toWriter(out, encoding)){
+                        AcmeJsonOutput.writeJson(data,w,indent?0:-1);
+                    }
+                }else super.write(data, out);
             }
 
         }.run();
@@ -135,13 +125,11 @@ public class FlowFileWorker {
             void write(Object o, OutputStream out) throws Exception {
                 Boolean xmlDeclaration = (Boolean) parms.getOrDefault("xmlDeclaration", Boolean.FALSE);
                 Boolean indent = (Boolean) parms.getOrDefault("indent", Boolean.TRUE);
-                if(o instanceof GPathResult){
-                    XmlUtil.serialize((GPathResult) o, out);
-                }else if(o instanceof Node) {
+                if(o instanceof Node) {
                     AcmeXmlOutput.toStream((Node) o, out, "UTF-8", xmlDeclaration, indent);
-                }else if(o instanceof StreamWritable) {
-                    ((StreamWritable)o).streamTo(out);
-                }else throw new RuntimeException("Unsupported writable object: "+o.getClass()+". Expected: GPathResult or groovy.util.Node for xml processing");
+                }else if(o instanceof GPathResult){
+                    XmlUtil.serialize((GPathResult) o, out);
+                }else super.write(o, out);
             }
         }.run();
     }
@@ -152,13 +140,13 @@ public class FlowFileWorker {
 	}
 
     /**
-     * runs closure `c` passing one (Reader sin) or two (Reader sin,Map attr) parameters.
+     * runs closure `transform` passing one (Reader sin) or two (Reader sin,Map attr) parameters.
      * closure should process input data, optionally change the attributes, and could return the StreamWritable object or null to drop flow file.
      * @param parms `encoding` - the encoding to read the input stream (default UTF-8)
-     * @param c
+     * @param transform
      */
-    public void withReader(final Map<String,Object> parms, Closure c){
-        new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, c){
+    public void withReader(final Map<String,Object> parms, Closure transform){
+        new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){
             final String encoding = (String)parms.getOrDefault("encoding","UTF-8");
 			Reader reader;
             @Override
@@ -183,12 +171,13 @@ public class FlowFileWorker {
     }
 
     /**
-     * runs `c` closure passing two (Reader r,Writer w) or three (Reader r,Writer w,Map attr) parameters. closure should process reader data, write output to writer, and optionaly change the attributes.
-     * note, that return value of the closure is ignored.
+     * runs `transform` closure passing two (Reader r,Writer w) or three (Reader r,Writer w,Map attr) parameters.
+     * closure should process reader data, write output to writer, and optionaly change the attributes. use only if you don't need to drop file.
+     * note, that return value of the closure ignored.
      * @param parms additional parameter(s): `encoding` - encoding used for reader and writer (default=UTF-8)
-     * @param c closure
+     * @param transform closure
      */
-    public void withReadWriter(final Map<String,Object> parms, final Closure c){
+    public void withReadWriter(final Map<String,Object> parms, final Closure transform){
         final String encoding = (String)parms.getOrDefault("encoding","UTF-8");
         new ParseTransformWriteContext(session, flowFile, REL_SUCCESS){
             @Override
@@ -196,46 +185,64 @@ public class FlowFileWorker {
                 Object ret = null;
                 try(Reader r = toReader(sin,encoding)){
                     try(Writer w = toWriter(sout,encoding)){
-                        if(c.getMaximumNumberOfParameters()==2){
-                            ret = c.call(r,w);
+                        if(transform.getMaximumNumberOfParameters()==2){
+                            ret = delegated(transform).call(r,w);
                         }else{
-                            ret = c.call(r,w,attr);
+                            ret = delegated(transform).call(r,w,attr);
                         }
                         w.flush();
                     }
                 }
-                return (ret!=null); //transfer file
+                return true; //(ret!=null); //transfer file
             }
         }.run();
     }
 
     /**
-     * runs closure `c` passing two (InputStream sin,OutputStream sout) or three (InputStream sin,OutputStream sout,Map attr) parameters. closure should process input data, write output, and optionally change the attributes.
-     * note, that `null` return value of the closure drops flow file and any other value transfers it.
-     * @param c
+     * runs closure `transform` passing two (InputStream sin,OutputStream sout) or three (InputStream sin,OutputStream sout,Map attr) parameters.
+     * closure should process input data, write output, and optionally change the attributes. use only when you don't need to drop flow file.
+     * note, that return value of the closure ignored.
+     * @param transform
      */
-    public void withStreams(final Closure c){
+    public void withStreams(final Closure transform){
         new ParseTransformWriteContext(session, flowFile, REL_SUCCESS){
             @Override
             public boolean processContent(InputStream sin, OutputStream sout, ControlMap attr) throws IOException {
                 Object ret = null;
-                if(c.getMaximumNumberOfParameters()==2){
-                    ret = c.call(sin,sout);
+                if(transform.getMaximumNumberOfParameters()==2){
+                    ret = this.delegated(transform).call(sin,sout);
                 }else{
-                    ret = c.call(sin,sout,attr);
+                    ret = this.delegated(transform).call(sin,sout,attr);
                 }
-                return (ret!=null); //transfer file
+                return true; //(ret!=null); //transfer file
             }
         }.run();
     }
 
 
     /**
-     * runs closure `c` passing one (InputStream sin) or two (InputStream sin,Map attr) parameters. closure should process input data, optionally change the attributes, and could return the StreamWritable object or null to drop flow file.
-     * @param c the transformer to apply to a flowfile content
+     * runs closure `transform` passing one (InputStream sin) or two (InputStream sin,Map attr) parameters. closure should process input data, optionally change the attributes, and could return the StreamWritable object or null to drop flow file.
+     * @param transform the transformer to apply to a flowfile content
      */
-    public void withStream(Closure c){
-        new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, c).run();
+    public void withStream(Closure transform){
+        new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform).run();
+    }
+
+    /**
+     * writes content & attributes to current flow file without processing current file content.
+     * @param transform closure that could accept one (attributes) or zero parameters. must return one of the: `asStream{}`, `asWriter{}`, CharSequence, groovy.lang.Writable
+     */
+    public void write(final Closure transform){
+        new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){
+            @Override
+            public Object transform(Object data, ControlMap attr) throws IOException {
+                if(transform.getMaximumNumberOfParameters()==1){
+                    return delegated(transform).call(attr);
+                }else{
+                    return delegated(transform).call();
+                }
+            }
+        }.run();
     }
 
 }

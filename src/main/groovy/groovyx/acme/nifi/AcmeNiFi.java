@@ -22,6 +22,7 @@ package groovyx.acme.nifi;
 import groovy.lang.Closure;
 import groovy.lang.Script;
 import groovy.text.Template;
+import org.apache.nifi.components.PropertyValue;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -42,50 +43,6 @@ public class AcmeNiFi{
 		return new FlowFileWorker(script,true);
 	}
 
-    /** helper to return alternate serializer of the parsed flowfile object that requires writer.
-     * <code>return asWriter("UTF-8"){out-> out.write(stringContent)}</code>
-     * */
-	public static StreamWritable asWriter(String encoding, final Closure c){
-        return new StreamWritable(encoding){
-            @Override
-            protected Writer writeTo(Writer out)throws IOException {
-                c.call(out);
-                return out;
-            }
-        };
-	}
-    /** helper to return alternate serializer of the parsed flowfile object that requires writer.
-     * <code>return asWriter{out-> out.write(stringContent)}</code>
-     * */
-    public static StreamWritable asWriter(Closure c){
-        return asWriter("UTF-8",c);
-    }
 
-    /** helper to return alternate serializer of the parsed flowfile object.
-     * <code>return asStream{out-> out.write(bytesContent)}</code>
-     * */
-	public static StreamWritable asStream(final Closure c){
-        return new StreamWritable(null){
-            @Override
-            public OutputStream streamTo(OutputStream out)throws IOException{
-                c.call(out);
-                return out;
-            }
-        };
-	}
 
-    /** helper to return alternate serializer based on GSP-like template.
-     * <code>return asTemplate([var_json:json], 'value from json: <%= var_json.key1.key2 %>' )</code>
-     * */
-	public static StreamWritable asTemplate(final Map<String,Object> args, final String template){
-	    String encoding = (String)args.getOrDefault("encoding", "UTF-8");
-        return new StreamWritable(encoding){
-            @Override
-            protected Writer writeTo(Writer out) throws IOException {
-                Template t = Templates.get(template);
-                t.make(args).writeTo(out);
-                return out;
-            }
-        };
-	}
 }
