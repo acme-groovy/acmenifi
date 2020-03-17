@@ -10,7 +10,7 @@ import java.util.Set;
 /**
  * Created by dm on 17.02.2019.
  */
-class ControlMap extends HashMap<String,Object> {
+public class ControlMap extends HashMap<String,Object> {
     private Set<String> removedKeys=new HashSet<>(); //items removed from map
     private Set<String> modifiedKeys=new HashSet<>(); //items removed from map
 

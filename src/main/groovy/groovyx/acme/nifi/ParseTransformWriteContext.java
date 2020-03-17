@@ -18,12 +18,12 @@ import org.apache.nifi.processor.io.StreamCallback;
 /**
  * Created by dm on 16.02.2019.
  */
-class ParseTransformWriteContext implements Runnable, StreamCallback{
-    private TransformDelegate transformDelegate = new TransformDelegate();
+public class ParseTransformWriteContext implements Runnable, StreamCallback{
+    private Object transformerDelegate = null;
     /*must be assigned in constructor*/
     protected Closure transform;
-    protected FlowFile flowFile;
     protected ProcessSession session;
+    protected FlowFile flowFile;
     protected Relationship REL_SUCCESS;
 
     //private object to store intermediate data between processing stages
@@ -31,34 +31,35 @@ class ParseTransformWriteContext implements Runnable, StreamCallback{
     private Object flowData = null;
     private ControlMap flowAttr = null;
 
-    //protected Object data=null;
-
-    ParseTransformWriteContext(ProcessSession session, FlowFile flowFile, Relationship REL_SUCCESS, Closure transform){
+    /**
+     * default constructor the method init() must be called to initialize the instance
+     */
+    public ParseTransformWriteContext(){}
+    public final void init(ProcessSession session, FlowFile flowFile, Relationship REL_SUCCESS, Closure transform){
+        if(session==null)throw  new IllegalArgumentException("The session could not be null");
+        if(this.session!=null)throw  new IllegalArgumentException("The session already has been initialized");
         this.session = session;
         this.flowFile = flowFile;
         this.REL_SUCCESS = REL_SUCCESS;
         this.transform = transform;
     }
 
-    ParseTransformWriteContext(ProcessSession session, FlowFile flowFile, Relationship REL_SUCCESS){
-        this.session = session;
-        this.flowFile = flowFile;
-        this.REL_SUCCESS = REL_SUCCESS;
-        this.transform = null;
+    protected ParseTransformWriteContext(ProcessSession session, FlowFile flowFile, Relationship REL_SUCCESS, Closure transform){
+        this.init(session, flowFile, REL_SUCCESS, transform);
     }
 
     /** takes input stream and deserializes it if necessary.
      * by default transfers to the next step (transform) the stream itself without parsing.
      * for example at this step we could parse the input stream to json object
      */
-    Object parse(InputStream in) throws Exception{
+    protected Object parse(InputStream in) throws Exception{
         return in;
     }
 
     /** takes data just after parsing, transforms it if needed, and returns a new representation of data to be used on the next stage (write).
      * by default calls `transform` closure if it not null. attributes could be changed during this call.
      */
-    Object transform(Object data, ControlMap attr) throws Exception{
+    protected Object transform(Object data, ControlMap attr) throws Exception{
         if(transform!=null) {
             if (transform.getMaximumNumberOfParameters() == 1) {
                 data = delegated(transform).call(data);
@@ -70,16 +71,16 @@ class ParseTransformWriteContext implements Runnable, StreamCallback{
     }
 
     /*calls asWritable(data) and then writes data to the output*/
-    void write(Object data, OutputStream out) throws Exception{
+    protected void write(Object data, OutputStream out) throws Exception{
         if(data instanceof StreamWritable) ((StreamWritable)data).streamTo(out);
         else if(data instanceof InputStream) org.codehaus.groovy.runtime.IOGroovyMethods.leftShift(out, (InputStream)data);
         else if(data instanceof Writable) {
-            try(Writer w=toWriter(out,"UTF-8")){
+            try(Writer w=IOUtils.toWriter(out,"UTF-8")){
                 ((Writable)data).writeTo(w);
                 w.flush();
             }
         }else if(data instanceof CharSequence){
-            try(Writer w=toWriter(out,"UTF-8")){
+            try(Writer w=IOUtils.toWriter(out,"UTF-8")){
                 w.append((CharSequence)data);
                 w.flush();
             }
@@ -93,7 +94,7 @@ class ParseTransformWriteContext implements Runnable, StreamCallback{
      * @param attr attributes map
      * @return true if we should transfer the file, false to drop
      */
-    boolean processContent(InputStream sin, OutputStream sout, ControlMap attr) throws Exception{
+    protected boolean processContent(InputStream sin, OutputStream sout, ControlMap attr) throws Exception{
         //read & parse
         if (flowFile.getSize() > 0) {
             //we don't call `parse` for an empty content. and flowData remains null.
@@ -164,93 +165,28 @@ class ParseTransformWriteContext implements Runnable, StreamCallback{
     }
 
     /**
-     * sets transformerDelegate for the closure and returns closure
+     * method used for external transformers implementation calls.
+     * @param args
      */
-    protected Closure delegated(Closure c){
-        c.setDelegate( transformDelegate );
-        return c;
-    }
-
-    static Reader toReader(InputStream in, String encoding) throws UnsupportedEncodingException {
-        return new BufferedReader(new InputStreamReader(in, encoding));
-    }
-    static Writer toWriter(OutputStream out, String encoding) throws UnsupportedEncodingException {
-        return new BufferedWriter(new OutputStreamWriter(out, encoding));
+    protected void invoke(Object[]args) {
+        throw new RuntimeException("Not implemented");
     }
 
     /**
-     * class used as a delegate object for transform closures
+     * method that should return the delegate object used to initialize transform closure
+     * @return Object that will be used as a delegate for current transform
      */
-    class TransformDelegate{
-        /** helper to return alternate serializer of the parsed flowfile object that requires writer.
-         * <code>return asWriter("UTF-8"){out-> out.write(stringContent)}</code>
-         * */
-        public StreamWritable asWriter(Map<String,Object> args, final Closure c){
-            return new StreamWritable(args){
-                @Override
-                protected Writer writeTo(Writer out)throws IOException {
-                    c.call(out);
-                    return out;
-                }
-            };
-        }
-        /** helper to return alternate serializer of the parsed flowfile object that requires writer.
-         * <code>return asWriter{out-> out.write(stringContent)}</code>
-         * */
-        @SuppressWarnings("unchecked")
-        public StreamWritable asWriter(Closure c){
-            return asWriter(Collections.EMPTY_MAP,c);
-        }
-
-        /** helper to return alternate serializer of the parsed flowfile object.
-         * <code>return asStream{out-> out.write(bytesContent)}</code>
-         * */
-        public StreamWritable asStream(final Closure c){
-            return new StreamWritable("stream"){
-                @Override
-                public OutputStream streamTo(OutputStream out)throws IOException{
-                    c.call(out);
-                    return out;
-                }
-            };
-        }
-
-
-
-        /** helper to return alternate serializer based on GSP-like template.
-         * <code>return asTemplate([var_json:json], 'value from json: <%= var_json.key1.key2 %>' )</code>
-         * */
-        public StreamWritable asTemplate(final Map<String,Object> args, final String template){
-            String encoding = (String)args.getOrDefault("encoding", "UTF-8");
-            return new StreamWritable(encoding){
-                @Override
-                protected Writer writeTo(Writer out) throws IOException {
-                    Template t = Templates.get(template);
-                    t.make(args).writeTo(out);
-                    return out;
-                }
-            };
-        }
-
-        public StreamWritable asTemplate(final Map<String,Object> args, final PropertyValue template) {
-            return  asTemplate(args, template.getValue());
-        }
-
-        @SuppressWarnings("unchecked")
-        public FlowFileWorker createFlowFile() {
-            return createFlowFile(Collections.EMPTY_MAP);
-        }
-        /**
-         * creates flowFile from current flow file with cloning only attributes or if `parms.copyContent==true` with cloning attributes and content.
-         * @param parms `cloneContent` if true clones attributes and content of current flow file; otherwise clones only attributes (default=false)
-         * @return new new flow file worker
-         */
-        public FlowFileWorker createFlowFile(final Map<String,Object> parms){
-            Boolean content    = (Boolean)parms.getOrDefault("copyContent", Boolean.FALSE);
-            return new FlowFileWorker(
-                    content?session.clone(flowFile):session.create(flowFile),
-                    session, REL_SUCCESS);
-        }
-
+    protected Object createTransformerDelegate(){
+        return new TransformerDelegate(this);
     }
+
+    /**
+     * sets transformerDelegate for the closure and returns closure
+     */
+    final protected Closure delegated(Closure c){
+        if(transformerDelegate==null)transformerDelegate = createTransformerDelegate();
+        c.setDelegate( transformerDelegate );
+        return c;
+    }
+
 }

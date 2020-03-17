@@ -19,7 +19,7 @@
 package groovyx.acme.nifi;
 
 
-import java.io.IOException;
+import java.io.*;
 
 /**
  * nifi helpers
@@ -49,6 +49,15 @@ public class IOUtils{
 			try { out.close(); } catch (IOException e) {}
 		}
 	}
+
+	public static Reader toReader(InputStream in, String encoding) throws UnsupportedEncodingException {
+		return new BufferedReader(new InputStreamReader(in, encoding));
+	}
+
+	public static Writer toWriter(OutputStream out, String encoding) throws UnsupportedEncodingException {
+		return new BufferedWriter(new OutputStreamWriter(out, encoding));
+	}
+
 
 
 }

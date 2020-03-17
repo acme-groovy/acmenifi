@@ -147,10 +147,16 @@ if incoming json file is really large there is a possibility to process it in ev
 ```groovy
 import static groovyx.acme.nifi.AcmeNiFi.*
 withFlowFile(this).withJsonReader(encoding:"UTF-8"){attr->
+    def i = 0
     onValue('$.message.data.*'){item->
-        //closure triggered when json path matches 
+        //closure triggered when json path matches
+        item.index = i++ 
         item.txt = item.txt.capitalize()
         return item
+    }
+    onEOF{
+        //write total number of items into flowfile attribute
+        attr.TotalCount = i
     }
     return asJsonWriter(indent:true)
 }
@@ -171,7 +177,7 @@ withFlowFile(this).withJsonReader(encoding:"UTF-8"){attr->
       },
       {
         "id": 125,
-        "txt": "Ad astra per aspera"
+        "txt": "ad astra per aspera"
       }
     ]
   }
@@ -184,18 +190,26 @@ withFlowFile(this).withJsonReader(encoding:"UTF-8"){attr->
     "data": [
       {
         "id": 123,
-        "txt": "Carpe vinum"
+        "txt": "Carpe vinum",
+        "index": 0
       },
       {
         "id": 124,
-        "txt": "Dulce periculum"
+        "txt": "Dulce periculum",
+        "index": 1
       },
       {
         "id": 125,
-        "txt": "Ad astra per aspera"
+        "txt": "Ad astra per aspera",
+        "index": 2
       }
     ]
   }
 }
 ```
+##### attributes
+```groovy
+TotalCount="3"
+```
+
 ----

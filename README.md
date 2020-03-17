@@ -2,6 +2,8 @@
 
 Helpers for groovy script processor in NiFi.
 
+Actually it's a try to minimize scripting required to work with some standard formats in apache-nifi
+
 ## how to use it in nifi
 
 there are two ways of usage
@@ -53,7 +55,6 @@ I imagine a closure where I can say: want to work with flow file as with json an
 So, the same code as above will look like:
 
 ```groovy
-@Grab(group='acme.groovy', module='acmenifi', version='20190218', transitive=false)
 import static groovyx.acme.nifi.AcmeNiFi.*
 
 withFlowFile(this).withJson(encoding:"UTF-8", indent:true){json,attr->
@@ -62,24 +63,9 @@ withFlowFile(this).withJson(encoding:"UTF-8", indent:true){json,attr->
 }
 ```
 
-the same but with XML in flow file (XmlParser)
+set flow file attributes from json content
 
 ```groovy
-@Grab(group='acme.groovy', module='acmenifi', version='20190218', transitive=false)
-import static groovyx.acme.nifi.AcmeNiFi.*
-
-withFlowFile(this).withXml{xml,attr->
-  xml.appendNode{
-    today new Date().format("yyyy-MM-dd")
-  }
-  return xml
-}
-```
-
-read/write flow file attributes
-
-```groovy
-@Grab(group='acme.groovy', module='acmenifi', version='20190218', transitive=false)
 import static groovyx.acme.nifi.AcmeNiFi.*
 
 withFlowFile(this).withJson(encoding:"UTF-8", indent:true){json,attr->
@@ -92,4 +78,4 @@ withFlowFile(this).withJson(encoding:"UTF-8", indent:true){json,attr->
 }
 ```
 
-
+See more examples: [EXAMPLES.md](./EXAMPLES.md)

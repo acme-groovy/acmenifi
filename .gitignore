@@ -2,3 +2,6 @@
 /.gradle
 /local.properties
 /.idea
+/*.iml
+/*.ipr
+/*.iws

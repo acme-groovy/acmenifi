@@ -3,6 +3,8 @@ package groovyx.acme.nifi;
 import groovy.json.JsonParserType;
 import groovy.json.JsonSlurper;
 import groovy.lang.Closure;
+import groovy.lang.GroovyRuntimeException;
+import groovy.lang.MissingMethodException;
 import groovy.lang.Script;
 import groovy.text.Template;
 import groovy.util.Node;
@@ -18,6 +20,7 @@ import java.io.Writer;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.nifi.components.PropertyValue;
@@ -74,17 +77,17 @@ public class FlowFileWorker {
             final Boolean indent = (Boolean)parms.getOrDefault("indent",   Boolean.FALSE);
             final Boolean relax = (Boolean)parms.getOrDefault("relax",   Boolean.FALSE);
             @Override
-            Object parse(InputStream in) throws Exception {
-                try( Reader r = toReader(in, encoding)){
+            protected Object parse(InputStream in) throws Exception {
+                try( Reader r = IOUtils.toReader(in, encoding)){
                     JsonSlurper parser = new JsonSlurper();
                     if(relax)parser.setType(JsonParserType.LAX);
                     return parser.parse(r);
                 }
             }
             @Override
-            void write(Object data, OutputStream out) throws Exception {
+            protected void write(Object data, OutputStream out) throws Exception {
                 if(data instanceof Map || data instanceof Collection || data instanceof CharSequence || data instanceof Boolean || data instanceof Number){
-                    try( Writer w = toWriter(out, encoding)){
+                    try( Writer w = IOUtils.toWriter(out, encoding)){
                         AcmeJsonOutput.writeJson(data,w,indent?0:-1);
                     }
                 }else super.write(data, out);
@@ -110,7 +113,8 @@ public class FlowFileWorker {
      */
     public void withXml(final Map<String,Object> parms, Closure transform){
         new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){
-            @Override Object parse(InputStream in) throws Exception {
+            @Override
+            protected Object parse(InputStream in) throws Exception {
                 Object parser = parms.get("parser");
                 if(parser!=null){
                     Method m = parser.getClass().getMethod("parse", InputStream.class);
@@ -122,7 +126,7 @@ public class FlowFileWorker {
                 }
             }
             @Override
-            void write(Object o, OutputStream out) throws Exception {
+            protected void write(Object o, OutputStream out) throws Exception {
                 Boolean xmlDeclaration = (Boolean) parms.getOrDefault("xmlDeclaration", Boolean.FALSE);
                 Boolean indent = (Boolean) parms.getOrDefault("indent", Boolean.TRUE);
                 if(o instanceof Node) {
@@ -150,8 +154,8 @@ public class FlowFileWorker {
             final String encoding = (String)parms.getOrDefault("encoding","UTF-8");
 			Reader reader;
             @Override
-            Object parse(InputStream in) throws Exception {
-				reader = toReader(in, encoding);
+            protected Object parse(InputStream in) throws Exception {
+				reader = IOUtils.toReader(in, encoding);
 				return reader;
             }
             @Override
@@ -179,12 +183,12 @@ public class FlowFileWorker {
      */
     public void withReadWriter(final Map<String,Object> parms, final Closure transform){
         final String encoding = (String)parms.getOrDefault("encoding","UTF-8");
-        new ParseTransformWriteContext(session, flowFile, REL_SUCCESS){
+        new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, null){
             @Override
             public boolean processContent(InputStream sin, OutputStream sout, ControlMap attr) throws IOException {
                 Object ret = null;
-                try(Reader r = toReader(sin,encoding)){
-                    try(Writer w = toWriter(sout,encoding)){
+                try(Reader r = IOUtils.toReader(sin,encoding)){
+                    try(Writer w = IOUtils.toWriter(sout,encoding)){
                         if(transform.getMaximumNumberOfParameters()==2){
                             ret = delegated(transform).call(r,w);
                         }else{
@@ -205,7 +209,7 @@ public class FlowFileWorker {
      * @param transform
      */
     public void withStreams(final Closure transform){
-        new ParseTransformWriteContext(session, flowFile, REL_SUCCESS){
+        new ParseTransformWriteContext(session, flowFile, REL_SUCCESS,null){
             @Override
             public boolean processContent(InputStream sin, OutputStream sout, ControlMap attr) throws IOException {
                 Object ret = null;
@@ -244,5 +248,40 @@ public class FlowFileWorker {
             }
         }.run();
     }
+
+    private Map<String, Class<ParseTransformWriteContext>> methodsCache = new HashMap<>();
+    /**
+     * method to support external `with` commands implementation. normally called by groovy.
+     */
+    @SuppressWarnings("unchecked")
+    public Object methodMissing(String name, Object arg){
+        Object[] args = null;
+        if( arg instanceof Object[] )args = (Object[])arg;
+        else throw new RuntimeException("Unsupported argument list: "+arg+" for `"+name+"`");
+        if(name==null || name.length()<1) throw new RuntimeException("Unsupported method: `"+arg+"`");
+
+        Class<ParseTransformWriteContext> methodClass = methodsCache.get(name);
+        if(methodClass==null) {
+            String className = "groovyx.acme.nifi.worker." + name + "." + Character.toUpperCase(name.charAt(0)) + name.substring(1);
+            try {
+                methodClass = (Class<ParseTransformWriteContext>) this.getClass().getClassLoader().loadClass(className);
+            } catch (Throwable e) {
+                MissingMethodException me = new MissingMethodException( name, this.getClass(), args );
+                throw new RuntimeException(me.getMessage(),e);
+            }
+            methodsCache.put(name,methodClass);
+        }
+
+        ParseTransformWriteContext ctx = null;
+        try {
+            ctx = methodClass.newInstance();
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to instantiate "+methodClass,e);
+        }
+        ctx.init(this.session, this.flowFile, this.REL_SUCCESS, null);
+        ctx.invoke(args);
+        return null;
+    }
+
 
 }

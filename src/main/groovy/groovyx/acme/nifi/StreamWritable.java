@@ -17,7 +17,7 @@ import org.apache.nifi.processor.io.OutputStreamCallback;
 abstract public class StreamWritable { // implements OutputStreamCallback {
     private String encoding;
 
-    StreamWritable(String encoding){
+    public StreamWritable(String encoding){
         this.encoding=encoding;
     }
 
