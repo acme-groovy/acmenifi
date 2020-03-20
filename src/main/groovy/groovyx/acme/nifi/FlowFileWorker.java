@@ -3,13 +3,10 @@ package groovyx.acme.nifi;
 import groovy.json.JsonParserType;
 import groovy.json.JsonSlurper;
 import groovy.lang.Closure;
-import groovy.lang.GroovyRuntimeException;
 import groovy.lang.MissingMethodException;
 import groovy.lang.Script;
-import groovy.text.Template;
 import groovy.util.Node;
 import groovy.util.XmlParser;
-import groovy.util.XmlSlurper;
 import groovy.util.slurpersupport.GPathResult;
 import groovy.xml.XmlUtil;
 import java.io.IOException;
@@ -23,19 +20,18 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.nifi.components.PropertyValue;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.processor.Relationship;
 
 
 /**
- * helper class that provides methods to process a flow file. could be created using `AcmeNiFi.withFlowFile` or `AcmeNiFi.newFlowFile`.
- * <code>
- *     AcmeNiFi.withFlowFile(this).withJson(encoding: "UTF-8"){json->
- *         return json.findAll{k,v-> k.startsWith("a")} // produces json from source with keys that starts with 'a'
+ * class that provides methods to process a flow file. could be created using `AcmeNiFi.withFlowFile` or `AcmeNiFi.newFlowFile`.
+ * <pre>{@code
+ *     withFlowFile(this).withJson(encoding: "UTF-8"){json->   // worker that process flowfile content as json
+ *         return json.findAll{k,v-> k.startsWith("a")}        // produces json from source with keys that starts with 'a'
  *     }
- * </code>
+ * }</pre>
  */
 public class FlowFileWorker {
     private FlowFile flowFile;
@@ -64,8 +60,9 @@ public class FlowFileWorker {
     }
 
     /**
-     * treats input data as json - the result of JsonSlurper.parse(inStream) and passes the result into `transform` closure.
-     * closure must return Map/List groovy object that will be serialized to json or null to drop the output file.
+     * treats input data as json - the result of JsonSlurper.parse(inStream) and passes the parsed json into `transform` closure.
+     * closure must accept one (json) or two (json,attrs) parameters, process/transform it, and return json groovy object.
+     * The result of closure will be written to output flow file as json unless the return value is rusult of `asWriter{}` or `asStream{}`.
      * @param parms `encoding` - encoding user to parse/write json (default=UTF-8).
      *              `indent` -  true if you want to pretty print the output json (default=false).
      *              `relax` - true if reLAX parser must be applied to accept unquoted strings (default=false).
@@ -88,7 +85,7 @@ public class FlowFileWorker {
             protected void write(Object data, OutputStream out) throws Exception {
                 if(data instanceof Map || data instanceof Collection || data instanceof CharSequence || data instanceof Boolean || data instanceof Number){
                     try( Writer w = IOUtils.toWriter(out, encoding)){
-                        AcmeJsonOutput.writeJson(data,w,indent?0:-1);
+                        JsonUtils.writeJson(data,w,indent?0:-1);
                     }
                 }else super.write(data, out);
             }
@@ -130,7 +127,7 @@ public class FlowFileWorker {
                 Boolean xmlDeclaration = (Boolean) parms.getOrDefault("xmlDeclaration", Boolean.FALSE);
                 Boolean indent = (Boolean) parms.getOrDefault("indent", Boolean.TRUE);
                 if(o instanceof Node) {
-                    AcmeXmlOutput.toStream((Node) o, out, "UTF-8", xmlDeclaration, indent);
+                    XmlUtils.toStream((Node) o, out, "UTF-8", xmlDeclaration, indent);
                 }else if(o instanceof GPathResult){
                     XmlUtil.serialize((GPathResult) o, out);
                 }else super.write(o, out);
@@ -147,7 +144,7 @@ public class FlowFileWorker {
      * runs closure `transform` passing one (Reader sin) or two (Reader sin,Map attr) parameters.
      * closure should process input data, optionally change the attributes, and could return the StreamWritable object or null to drop flow file.
      * @param parms `encoding` - the encoding to read the input stream (default UTF-8)
-     * @param transform
+     * @param transform transformer
      */
     public void withReader(final Map<String,Object> parms, Closure transform){
         new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){
@@ -166,8 +163,8 @@ public class FlowFileWorker {
     }
 
     /**
-     * the same as another asReadWriter but with default parameters (encoding)
-     * @param c
+     * the same as another asReadWriter but with default parameters (encoding=UTF-8)
+     * @param c see description in withReadWriter(Map,Closure)
      */
     @SuppressWarnings("unchecked")
     public void withReadWriter(Closure c) {
@@ -206,7 +203,7 @@ public class FlowFileWorker {
      * runs closure `transform` passing two (InputStream sin,OutputStream sout) or three (InputStream sin,OutputStream sout,Map attr) parameters.
      * closure should process input data, write output, and optionally change the attributes. use only when you don't need to drop flow file.
      * note, that return value of the closure ignored.
-     * @param transform
+     * @param transform closure
      */
     public void withStreams(final Closure transform){
         new ParseTransformWriteContext(session, flowFile, REL_SUCCESS,null){
@@ -225,7 +222,8 @@ public class FlowFileWorker {
 
 
     /**
-     * runs closure `transform` passing one (InputStream sin) or two (InputStream sin,Map attr) parameters. closure should process input data, optionally change the attributes, and could return the StreamWritable object or null to drop flow file.
+     * runs closure `transform` passing one (InputStream sin) or two (InputStream sin,Map attr) parameters.
+     * closure should process input data, optionally change the attributes, and could return the StreamWritable object or null to drop flow file.
      * @param transform the transformer to apply to a flowfile content
      */
     public void withStream(Closure transform){
@@ -233,8 +231,9 @@ public class FlowFileWorker {
     }
 
     /**
-     * writes content & attributes to current flow file without processing current file content.
-     * @param transform closure that could accept one (attributes) or zero parameters. must return one of the: `asStream{}`, `asWriter{}`, CharSequence, groovy.lang.Writable
+     * writes content and attributes to current flow file without processing current file content.
+     * @param transform closure that could accept one (attributes) or zero parameters. must return one of the:
+     * `asStream{}` , `asWriter{}` , `CharSequence` , or `groovy.lang.Writable`
      */
     public void write(final Closure transform){
         new ParseTransformWriteContext(session, flowFile, REL_SUCCESS, transform){
@@ -252,6 +251,10 @@ public class FlowFileWorker {
     private Map<String, Class<ParseTransformWriteContext>> methodsCache = new HashMap<>();
     /**
      * method to support external `with` commands implementation. normally called by groovy.
+     * searches for <code>groovyx.acme.nifi.worker.`name`.`Name`</code> class that implements flowfile transforming method
+     * @param name method name
+     * @param arg arguments provided by caller
+     * @return null
      */
     @SuppressWarnings("unchecked")
     public Object methodMissing(String name, Object arg){

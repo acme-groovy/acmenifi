@@ -7,9 +7,9 @@ import java.util.Collection;
 import java.util.Map;
 
 /**
- * Created by dm on 17.02.2019.
+ * Json utilities
  */
-public class AcmeJsonOutput {
+public class JsonUtils {
 
     private static void newLine(Writer w, int indent) throws IOException {
         if(indent!=-1) {
@@ -19,6 +19,14 @@ public class AcmeJsonOutput {
         }
     }
 
+    /**
+     * Writes map, array, or simple value to output writer as json.
+     * TODO: validate performance and try to reimplement without recurse.
+     * @param o map, array or simple value
+     * @param w writer where to write output
+     * @param indent should we indent (pretty print) output
+     * @throws IOException if io error occurred
+     */
     @SuppressWarnings("unchecked")
     public static void writeJson(Object o, Writer w, int indent) throws IOException {
         int cnt=0;

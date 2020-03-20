@@ -27,7 +27,7 @@ class AcmeNiFiTest extends GroovyTestCase {
 		def s = '{"a":{"b":[1,2,3,"xx"]},"C":"qwerty",'+((33..11).collect{'"aaa'+it+'":'+it}.join(','))+'}';
         o=new JsonSlurper().parseText(s);
         w=new StringWriter()
-        AcmeJsonOutput.writeJson(o,w,-1)
+        JsonUtils.writeJson(o,w,-1)
         assert w.toString()==JsonOutput.toJson(o)
 	}
     /* moved to examples

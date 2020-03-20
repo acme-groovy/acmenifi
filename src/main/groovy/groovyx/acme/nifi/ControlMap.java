@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Created by dm on 17.02.2019.
+ * class to hold modifiable flowfile attributes. monitors all changes done to map and later could return modified and removed keys. used almost in all workers.
  */
 public class ControlMap extends HashMap<String,Object> {
     private Set<String> removedKeys=new HashSet<>(); //items removed from map

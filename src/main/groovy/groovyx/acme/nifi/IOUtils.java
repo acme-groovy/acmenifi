@@ -22,8 +22,7 @@ package groovyx.acme.nifi;
 import java.io.*;
 
 /**
- * nifi helpers
- * by dlukyanov@ukr.net 
+ * io helpers
  */
 public class IOUtils{
 

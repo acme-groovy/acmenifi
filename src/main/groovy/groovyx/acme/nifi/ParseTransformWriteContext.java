@@ -16,7 +16,7 @@ import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.io.StreamCallback;
 
 /**
- * Created by dm on 16.02.2019.
+ * flow file worker base class used by all workers
  */
 public class ParseTransformWriteContext implements Runnable, StreamCallback{
     private Object transformerDelegate = null;
@@ -50,7 +50,10 @@ public class ParseTransformWriteContext implements Runnable, StreamCallback{
 
     /** takes input stream and deserializes it if necessary.
      * by default transfers to the next step (transform) the stream itself without parsing.
-     * for example at this step we could parse the input stream to json object
+     * for example at this step we could parse the input stream to json object.
+     * @param in flowfile input stream
+     * @return modified/parsed input stream. by default returns inputstream itself.
+     * @throws Exception to mitimize try-catch in implementation
      */
     protected Object parse(InputStream in) throws Exception{
         return in;
@@ -58,6 +61,10 @@ public class ParseTransformWriteContext implements Runnable, StreamCallback{
 
     /** takes data just after parsing, transforms it if needed, and returns a new representation of data to be used on the next stage (write).
      * by default calls `transform` closure if it not null. attributes could be changed during this call.
+     * @param data current flowfile content. by default flowfile input stream.
+     * @param attr modifiable flowfile attributes map
+     * @return transformed flowfile content
+     * @throws Exception to minimize try-catch inside this methods. all exceptions handled with `process` method.
      */
     protected Object transform(Object data, ControlMap attr) throws Exception{
         if(transform!=null) {
@@ -93,6 +100,7 @@ public class ParseTransformWriteContext implements Runnable, StreamCallback{
      * @param sout flow file output stream
      * @param attr attributes map
      * @return true if we should transfer the file, false to drop
+     * @throws Exception to minimize try-catch inside this methods. all exceptions handled with `process` method.
      */
     protected boolean processContent(InputStream sin, OutputStream sout, ControlMap attr) throws Exception{
         //read & parse
@@ -166,7 +174,7 @@ public class ParseTransformWriteContext implements Runnable, StreamCallback{
 
     /**
      * method used for external transformers implementation calls.
-     * @param args
+     * @param args arguments provided by script for this transformation.
      */
     protected void invoke(Object[]args) {
         throw new RuntimeException("Not implemented");
@@ -182,6 +190,8 @@ public class ParseTransformWriteContext implements Runnable, StreamCallback{
 
     /**
      * sets transformerDelegate for the closure and returns closure
+     * @param c closure to be modified
+     * @return closure with new delegate object
      */
     final protected Closure delegated(Closure c){
         if(transformerDelegate==null)transformerDelegate = createTransformerDelegate();

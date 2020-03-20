@@ -57,7 +57,7 @@ public class WithJsonReader extends ParseTransformWriteContext {
      * @param sout flow file output stream
      * @param attr attributes map
      * @return true if write json called
-     * @throws IOException
+     * @throws IOException if io error occurres
      */
     @Override
     protected boolean processContent(InputStream sin, OutputStream sout, ControlMap attr) throws IOException {

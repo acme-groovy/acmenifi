@@ -12,7 +12,17 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * class used as a delegate object for transform closures
+ * class used as a delegate object for transform closures.
+ * below you can find the methods you could use in default flowFile workers (FlowFileWorkers).
+ *
+ * Example:
+ * <code>
+ *     withFlowFile(this).withReader{r-&gt;     //worker start
+ *         asWriter{w-&gt;                      //one of the transformer context methods that returns writable
+ *             w &lt;&lt; r                           //transfer reader to writer without transforming
+ *         }
+ *     }
+ * </code>
  */
 public class TransformerDelegate extends GroovyObjectSupport {
     protected final ParseTransformWriteContext transformer$context;
@@ -28,7 +38,10 @@ public class TransformerDelegate extends GroovyObjectSupport {
     }
 
     /** helper to return alternate serializer of the parsed flowfile object that requires writer.
-     * <code>return asWriter("UTF-8"){out-> out.write(stringContent)}</code>
+     * <code>return asWriter("UTF-8"){out-&gt; out.write(stringContent)}</code>
+     * @param args parameters of closure: `encoding` the encoding to use to write the flow file
+     * @param c closure with one parameter (Writable) to write flowfile
+     * @return object ready to write flowfile
      * */
     public StreamWritable asWriter(Map<String,Object> args, final Closure c){
         return new StreamWritable(args){
@@ -40,7 +53,9 @@ public class TransformerDelegate extends GroovyObjectSupport {
         };
     }
     /** helper to return alternate serializer of the parsed flowfile object that requires writer.
-     * <code>return asWriter{out-> out.write(stringContent)}</code>
+     * <code>return asWriter{out-&gt; out.write(stringContent)}</code>
+     * @param c closure with one parameter (Writable) to write flowfile with default encoding `UTF-8`
+     * @return object ready to write flowfile
      * */
     @SuppressWarnings("unchecked")
     public StreamWritable asWriter(Closure c){
@@ -48,8 +63,10 @@ public class TransformerDelegate extends GroovyObjectSupport {
     }
 
     /** helper to return alternate serializer of the parsed flowfile object.
-     * <code>return asStream{out-> out.write(bytesContent)}</code>
-     * */
+     * <code>return asStream{out-&gt; out.write(bytesContent)}</code>
+     * @param c closure that receives one parameter `OutputStream` that could be used to write flow file
+     * @return object ready to write to flow file
+     **/
     public StreamWritable asStream(final Closure c){
         return new StreamWritable("stream"){
             @Override
@@ -63,7 +80,10 @@ public class TransformerDelegate extends GroovyObjectSupport {
 
 
     /** helper to return alternate serializer based on GSP-like template.
-     * <code>return asTemplate([var_json:json], 'value from json: <%= var_json.key1.key2 %>' )</code>
+     * <code>return asTemplate([var_json:json], 'value from json: &lt;%= var_json.key1.key2 %&gt;' )</code>
+     * @param args parameters to be used in template including `encoding` used to write output
+     * @param template the template body. could be a processor property name that holds the template.
+     * @return object ready to write flow file
      * */
     public StreamWritable asTemplate(final Map<String,Object> args, final String template){
         String encoding = (String)args.getOrDefault("encoding", "UTF-8");

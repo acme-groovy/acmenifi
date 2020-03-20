@@ -30,19 +30,36 @@ import java.io.Writer;
 import java.util.Map;
 
 /**
- * nifi helpers
- * by dlukyanov@ukr.net 
+ * The root nifi ExecuteGroovyScript helpers to process input file or create new one.
+ * Normally methods below included statically in script:
+ * <pre>{@code
+ *     import static groovyx.acme.nifi.AcmeNiFi.*
+ *
+ *     withFlowFile(this).withSomeWorker{  // check `FlowFileWorker` class for different workers
+ *         ...
+ *     }
+ * }</pre>
  */
 public class AcmeNiFi{
+	//no need to instantiate
+	private AcmeNiFi(){}
 
+	/**
+	 * get flowfile from input queue for processing
+	 * @param script the script where this file worker instantiated from. normally passed as `this` - <code>withFlowFile(this)</code>
+	 * @return returns `FlowFileWorker` class where default workers defined
+	 */
 	public static FlowFileWorker withFlowFile(Script script){
 		return new FlowFileWorker(script,false);
 	}
 
+	/**
+	 * creates new flowfile without getting new one from input queue.
+	 * @param script the script where this file worker instantiated from. normally passed as `this` - <code>newFlowFile(this)</code>
+	 * @return returns `FlowFileWorker` class where default workers defined
+	 */
 	public static FlowFileWorker newFlowFile(Script script){
 		return new FlowFileWorker(script,true);
 	}
-
-
 
 }
