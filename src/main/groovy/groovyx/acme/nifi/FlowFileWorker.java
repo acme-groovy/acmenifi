@@ -63,9 +63,12 @@ public class FlowFileWorker {
      * treats input data as json - the result of JsonSlurper.parse(inStream) and passes the parsed json into `transform` closure.
      * closure must accept one (json) or two (json,attrs) parameters, process/transform it, and return json groovy object.
      * The result of closure will be written to output flow file as json unless the return value is rusult of `asWriter{}` or `asStream{}`.
-     * @param parms `encoding` - encoding user to parse/write json (default=UTF-8).
-     *              `indent` -  true if you want to pretty print the output json (default=false).
-     *              `relax` - true if reLAX parser must be applied to accept unquoted strings (default=false).
+     * @param parms map with possible parameters:
+     * <table summary="">
+     * <tr class="rowColor"><td>encoding</td><td>encoding to parse/write json (default=UTF-8)</td></tr>
+     * <tr class="rowColor"><td>indent</td><td>true if you want to pretty print the output json (default=false)</td></tr>
+     * <tr class="rowColor"><td>relax</td><td>true if reLAX parser must be applied to accept unquoted strings (default=false)</td></tr>
+     * </table>
      * @param transform closure with one parameter - GPathResult
      */
     public void withJson(final Map<String,Object> parms, Closure transform){
@@ -101,11 +104,14 @@ public class FlowFileWorker {
     /**
      * treats input data as xml (groovy.util.Node) - the result of XmlParser.parse(inStream) and passes the result into `transform` closure.
      * closure must return groovy.util.Node, GPathResult, or StreamWriter to write output or null to drop output file.
-     * @param parms `validating` - true if the parser should validate documents as they are parsed (default=false, ignored if `parser` defined).
-     *              `namespaceAware` -  true if the parser should provide support for XML namespaces (default=true, ignored if `parser` defined).
-     *              `parser` - XmlSlurper or XmlParser object that has a method `parse(InputStream)` - if provided then `validating` and `namespaceAware` parameters are ignored.
-     *              `indent` - should the xml be pretty printed (default=true) (only for groovy.util.Node).
-     *              `xmlDeclaration` - prepend xml declaration (default=false) (only for groovy.util.Node).
+     * @param parms map with parsing/formatting options
+     * <table summary="">
+     * <tr class="rowColor"><td>validating</td><td>true if the parser should validate documents as they are parsed (default=false, ignored if `parser` defined)</td></tr>
+     * <tr class="rowColor"><td>namespaceAware</td><td>true if the parser should provide support for XML namespaces (default=true, ignored if `parser` defined)</td></tr>
+     * <tr class="rowColor"><td>parser</td><td>XmlSlurper or XmlParser object that has a method `parse(InputStream)` - if provided then `validating` and `namespaceAware` parameters are ignored</td></tr>
+     * <tr class="rowColor"><td>indent</td><td>should the xml be pretty printed (default=true) (only for groovy.util.Node)</td></tr>
+     * <tr class="rowColor"><td>xmlDeclaration</td><td>prepend xml declaration (default=false) (only for groovy.util.Node)</td></tr>
+     * </table>
      * @param transform closure with one parameter - GPathResult
      */
     public void withXml(final Map<String,Object> parms, Closure transform){
@@ -141,9 +147,12 @@ public class FlowFileWorker {
 	}
 
     /**
-     * runs closure `transform` passing one (Reader sin) or two (Reader sin,Map attr) parameters.
+     * runs closure `transform` passing one (Reader r) or two (Reader r,Map attr) parameters.
      * closure should process input data, optionally change the attributes, and could return the StreamWritable object or null to drop flow file.
-     * @param parms `encoding` - the encoding to read the input stream (default UTF-8)
+     * @param parms map with options
+     * <table summary="">
+     * <tr class="rowColor"><td>encoding</td><td>encoding to use to read input flow-file stream (default=UTF-8)</td></tr>
+     * </table>
      * @param transform transformer
      */
     public void withReader(final Map<String,Object> parms, Closure transform){
@@ -163,7 +172,7 @@ public class FlowFileWorker {
     }
 
     /**
-     * the same as another asReadWriter but with default parameters (encoding=UTF-8)
+     * the same as another asReadWriter but with default parameters
      * @param c see description in withReadWriter(Map,Closure)
      */
     @SuppressWarnings("unchecked")
@@ -172,10 +181,13 @@ public class FlowFileWorker {
     }
 
     /**
-     * runs `transform` closure passing two (Reader r,Writer w) or three (Reader r,Writer w,Map attr) parameters.
-     * closure should process reader data, write output to writer, and optionaly change the attributes. use only if you don't need to drop file.
+     * runs {@code transform} closure passing two (Reader r,Writer w) or three (Reader r,Writer w,Map attr) parameters.
+     * closure should process reader data, write output to writer, and optionally change the attributes. use only if you don't need to drop file.
      * note, that return value of the closure ignored.
      * @param parms additional parameter(s): `encoding` - encoding used for reader and writer (default=UTF-8)
+     * <table summary="">
+     * <tr class="rowColor"><td>encoding</td><td>encoding to use to read/write flow-file in/out streams (default=UTF-8)</td></tr>
+     * </table>
      * @param transform closure
      */
     public void withReadWriter(final Map<String,Object> parms, final Closure transform){
@@ -200,7 +212,7 @@ public class FlowFileWorker {
     }
 
     /**
-     * runs closure `transform` passing two (InputStream sin,OutputStream sout) or three (InputStream sin,OutputStream sout,Map attr) parameters.
+     * runs  {@code transform} closure passing two {@code (InputStream sin,OutputStream sout)} or three {@code (InputStream sin,OutputStream sout,Map attr)} parameters.
      * closure should process input data, write output, and optionally change the attributes. use only when you don't need to drop flow file.
      * note, that return value of the closure ignored.
      * @param transform closure
@@ -222,7 +234,7 @@ public class FlowFileWorker {
 
 
     /**
-     * runs closure `transform` passing one (InputStream sin) or two (InputStream sin,Map attr) parameters.
+     * runs {@code transform} closure passing one (InputStream sin) or two (InputStream sin,Map attr) parameters.
      * closure should process input data, optionally change the attributes, and could return the StreamWritable object or null to drop flow file.
      * @param transform the transformer to apply to a flowfile content
      */

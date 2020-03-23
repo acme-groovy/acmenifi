@@ -77,9 +77,15 @@ task sourcesJar(type: Jar, dependsOn: classes) {
     from sourceSets.main.allSource
 }
 
+/*
 task groovydocJar(type: Jar, dependsOn: groovydoc) {
     classifier = "groovydoc"
     from groovydoc.destinationDir
+}
+*/
+task groovydocJar(type: Jar, dependsOn: javadoc) {
+	classifier = "javadoc"
+	from javadoc.destinationDir
 }
 
 publishing {

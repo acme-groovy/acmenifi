@@ -12,7 +12,9 @@ import org.apache.nifi.processor.io.OutputStreamCallback;
 
 
 /**
- * class used to stream/write data to output. used by FlowFileWorker and TransformerDelegate
+ * class used to stream/write data to output. used by FlowFileWorker and TransformerDelegate.
+ * almost all workers supporting this object to be returned by transformers (closures).
+ * this class could be instantiated with one of the transformer delegate methods: {@code asWriter{w->...}} or {@code asStream{outStream->...}}   (see TransformerDelegate)
  */
 abstract public class StreamWritable { // implements OutputStreamCallback {
     private String encoding;

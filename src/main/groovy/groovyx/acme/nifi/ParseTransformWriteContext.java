@@ -16,7 +16,7 @@ import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.io.StreamCallback;
 
 /**
- * flow file worker base class used by all workers
+ * flow file worker base class used by all workers. containt the most re-usable transforming logic.
  */
 public class ParseTransformWriteContext implements Runnable, StreamCallback{
     private Object transformerDelegate = null;

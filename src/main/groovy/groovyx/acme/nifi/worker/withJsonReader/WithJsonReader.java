@@ -14,6 +14,35 @@ import java.io.*;
 import java.util.Collections;
 import java.util.Map;
 
+/**
+ * flow file worker that processes content with json reader that is useful for large json files.
+ * The worker {@code withJsonReader(opts){attr-> ... }} supports the following options:
+ * <table summary="">
+ * <tr class="rowColor"><td>encoding</td><td>encoding to use to read/write flow-file (default=UTF-8)</td></tr>
+ * <tr class="rowColor"><td>relax</td><td>{@code true} to use relax algorithm to parse json where double quotes are optional. (default=false)</td></tr>
+ * </table>
+ *
+ * <pre>{@code
+ * //convert format for values for all json object keys with name 'timestamp'
+ * //and count all such keys and put value into attribute
+ * withFlowFile(this).withJsonReader(encoding:"UTF-8",relax:false){attr->
+ *     int count = 0
+ *     //declare json reader event
+ *     onValue('$..timestamp'){value, jPath->
+ *         count++
+ *         //just to show how to access the "position" of the found value
+ *         assert jPath.peek().key == 'timestamp'
+ *         //assume the value of timestamp field in json was milliseconds since epoch
+ *         //return the converted value
+ *         return new Date(value).format("yyyy-MM-dd HH:mm:ss")
+ *     }
+ *     onEOF{
+ *         attr.TimestampCount = count
+ *     }
+ * }
+ * }</pre>
+ *
+ */
 
 public class WithJsonReader extends ParseTransformWriteContext {
     private String encoding;
@@ -89,7 +118,7 @@ public class WithJsonReader extends ParseTransformWriteContext {
         return ret!=null; //transfer
     }
 
-    class TransformerDelegateLocal {
+    public class TransformerDelegateLocal {
         /**
          * register event listener for the json reader
          * @param jPath simple json path. supported tokens:
