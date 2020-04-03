@@ -39,6 +39,8 @@ import java.util.Map;
  *     onEOF{
  *         attr.TimestampCount = count
  *     }
+ *     //without following line the output flow file will be dropped
+ *     return asJsonWriter(indent:true)
  * }
  * }</pre>
  *
@@ -146,21 +148,15 @@ public class WithJsonReader extends ParseTransformWriteContext {
 
         /**
          * creates json write handler for json reader. this could be one of returned methods in `JsonReader{ }` closure
-         * @param args `indent` pretty print the output json (default=false)
+         * @param opts `indent` pretty print the output json (default=false)
+         * @return json event handler that writes json to output writer
          */
-        public AcmeJsonHandler asJsonWriter(Map<String,Object>args){
-            boolean indent = (Boolean)args.getOrDefault("indent",Boolean.FALSE);
+        public AcmeJsonHandler asJsonWriter(Map<String,Object>opts){
+            boolean indent = (Boolean)opts.getOrDefault("indent",Boolean.FALSE);
             if(contentWriter==null)throw new IllegalStateException("json writer not yet defined");
             return new AcmeJsonWriteHandler(contentWriter,indent);
         }
 
-        /**
-         * closure `c` must create AcmeJsonHandler that could process json events in own way and write it to out writer (the first closure parameter)
-         */
-        public AcmeJsonHandler asJsonHandler(Closure c){
-            if(contentWriter==null)throw new IllegalStateException("json writer not yet defined");
-            return (AcmeJsonHandler)c.call(contentWriter);
-        }
     }
 
 }

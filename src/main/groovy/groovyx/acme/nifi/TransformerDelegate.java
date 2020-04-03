@@ -81,32 +81,6 @@ public class TransformerDelegate extends GroovyObjectSupport {
         };
     }
 
-
-    /* helper to return alternate serializer based on GSP-like template.
-     * <pre>{@code return asTemplate([var_json:json], 'value from json: <%= var_json.key1.key2 %>' )}</pre>
-     * @param args parameters to be used in template including `encoding` used to write output
-     * @param template the template body. could be a processor property name that holds the template.
-     * @return object ready to write flow file
-     * */
-
-    /*
-    public StreamWritable asTemplate(final Map<String,Object> args, final String template){
-        String encoding = (String)args.getOrDefault("encoding", "UTF-8");
-        return new StreamWritable(encoding){
-            @Override
-            protected Writer writeTo(Writer out) throws IOException {
-                Template t = Templates.get(template);
-                t.make(args).writeTo(out);
-                return out;
-            }
-        };
-    }
-
-    public StreamWritable asTemplate(final Map<String,Object> args, final PropertyValue template) {
-        return  asTemplate(args, template.getValue());
-    }
-    */
-
     @SuppressWarnings("unchecked")
     public FlowFileWorker createFlowFile() {
         return createFlowFile(Collections.EMPTY_MAP);

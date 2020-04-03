@@ -16,7 +16,7 @@ repositories {
 
 //============================================
 group = "acme.groovy"
-version = new Date().format("yyyyMMdd")
+version = new Date().format("yy.MM.dd")
 
 String nifi_version = "1.7.1"
 

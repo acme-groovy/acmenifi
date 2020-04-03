@@ -1,19 +1,30 @@
 package groovyx.acme.nifi.writer.asTemplate;
 
-import groovy.lang.Closure;
 import groovy.text.Template;
-import groovy.text.TemplateEngine;
 import groovyx.acme.nifi.StreamWritable;
-import groovyx.acme.nifi.Templates;
 import groovyx.acme.text.AcmeTemplateEngine;
 import org.apache.nifi.components.PropertyValue;
 import org.codehaus.groovy.runtime.InvokerHelper;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.util.Collections;
 import java.util.Map;
 import java.util.WeakHashMap;
+
+/**
+ * helper to create alternate serializer based on GSP-like template.
+ * <pre>{@code return asTemplate(binding: [var_json:json], template:'value from json: <%= var_json.key1.key2 %>' )}</pre>
+ * {@code asTemplate(...)} options:
+ * <table summary="">
+ * <tr class="rowColor"><td>encoding</td><td>encoding to use to write flow-file out stream (default=UTF-8)</td></tr>
+ * <tr class="rowColor"><td>template</td><td>mandatory parameter that defines a template. could be a string or the parameter of current processor, or any standard groovy templates</td></tr>
+ * <tr class="rowColor"><td>mode</td><td>template processing mode: <ul>
+ *     <li> {@code '%'} - JSP like template that supports {@code <% ... %>} code injection and {@code <%= ... %>} value injection </li>
+ *     <li> {@code '$'} - GroovyString like template  that supports {@code ${...}} value injections </li>
+ *     <li> {@code '&'} - mode that supports both modes above </li>
+ *     </ul></td></tr>
+ * </table>
+ * */
 
 public class AsTemplate extends StreamWritable {
     //private String encoding;
