@@ -43,8 +43,8 @@ new File("local.properties").with{f->
 dependencies {
 
 	compile(
-		[group: "acme.groovy",           name: "acmetemplate", version: "20190218"],
-		[group: "acme.groovy",           name: "acmejson",     version: "20200120"],
+		[group: "acme.groovy",           name: "acmetemplate", version: "20.04.02"],
+		[group: "acme.groovy",           name: "acmejson",     version: "20.04.02"],
 	)
 
 	compileOnly (

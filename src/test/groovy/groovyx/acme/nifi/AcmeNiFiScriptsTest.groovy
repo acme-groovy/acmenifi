@@ -74,10 +74,14 @@ class AcmeNiFiScriptsTest extends GroovyTestCase {
             assert processor.getSupportedPropertyDescriptors()
 
             TestRunner runner = TestRunners.newTestRunner(processor)
+            runner.setValidateExpressionUsage(false)
             //runner.addControllerService("dbcp", dbcp, new HashMap<>())
             //runner.enableControllerService(dbcp)
 
             runner.setProperty(processor.SCRIPT_BODY, parms.script)
+            //set dynamic properties
+            parms.each {k,v-> if(k.startsWith("property "))runner.setProperty(k.substring(9), v) }
+
             runner.assertValid()
 
             runner.enqueue(parms.source.getBytes("UTF-8"))

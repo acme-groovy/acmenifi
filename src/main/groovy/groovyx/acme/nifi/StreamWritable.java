@@ -17,7 +17,20 @@ import org.apache.nifi.processor.io.OutputStreamCallback;
  * this class could be instantiated with one of the transformer delegate methods: {@code asWriter{w->...}} or {@code asStream{outStream->...}}   (see TransformerDelegate)
  */
 abstract public class StreamWritable { // implements OutputStreamCallback {
-    private String encoding;
+    protected String encoding;
+
+    /**
+     * constructor used for dynamic implementations. after this constructor the method {@code init()} will be called for dynamic implementations.
+     */
+    public StreamWritable(){}
+
+    /**
+     * for dynamic delegate writable methods implementation.
+     * @param args arguments passed for implementation method in script.
+     */
+    public void init(Object []args){
+        throw new IllegalStateException("Not implemented");
+    }
 
     public StreamWritable(String encoding){
         this.encoding=encoding;

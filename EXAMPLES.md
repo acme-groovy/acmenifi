@@ -213,3 +213,60 @@ TotalCount="3"
 ```
 
 ----
+
+
+
+### transform data with template
+to transform data with a template declare a new property with name MY_TEMPLATE (for example)
+
+then you could use `asTemplate` to transform incoming data  
+
+##### property MY_TEMPLATE
+```jsp
+name : <%= myJson.message.name %>
+<% myJson.message.data.each{ item -> %>
+  <%= item.id %>, <%= item.txt %>
+<% } %>
+count: <%= myJson.message.data.size() %>
+```
+
+##### script
+```groovy
+import static groovyx.acme.nifi.AcmeNiFi.*
+withFlowFile(this).withJson(encoding:"UTF-8"){json, attr->
+    return asTemplate(template: MY_TEMPLATE, encoding: "UTF-8", mode:"%", binding:[myJson:json])
+}
+```
+
+##### source
+```json
+{
+  "message": {
+    "name": "strange phrases",
+    "data": [
+      {
+        "id": 123,
+        "txt": "carpe vinum"
+      },
+      {
+        "id": 124,
+        "txt": "dulce periculum"
+      },
+      {
+        "id": 125,
+        "txt": "ad astra per aspera"
+      }
+    ]
+  }
+}
+```
+##### result
+```text
+name : strange phrases
+  123, carpe vinum
+  124, dulce periculum
+  125, ad astra per aspera
+count: 3
+```
+
+----

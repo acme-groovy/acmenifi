@@ -2,6 +2,7 @@ package groovyx.acme.nifi;
 
 import groovy.lang.Closure;
 import groovy.lang.GroovyObjectSupport;
+import groovy.lang.MissingMethodException;
 import groovy.text.Template;
 import org.apache.nifi.components.PropertyValue;
 
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Writer;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -80,13 +82,14 @@ public class TransformerDelegate extends GroovyObjectSupport {
     }
 
 
-
-    /** helper to return alternate serializer based on GSP-like template.
+    /* helper to return alternate serializer based on GSP-like template.
      * <pre>{@code return asTemplate([var_json:json], 'value from json: <%= var_json.key1.key2 %>' )}</pre>
      * @param args parameters to be used in template including `encoding` used to write output
      * @param template the template body. could be a processor property name that holds the template.
      * @return object ready to write flow file
      * */
+
+    /*
     public StreamWritable asTemplate(final Map<String,Object> args, final String template){
         String encoding = (String)args.getOrDefault("encoding", "UTF-8");
         return new StreamWritable(encoding){
@@ -102,6 +105,7 @@ public class TransformerDelegate extends GroovyObjectSupport {
     public StreamWritable asTemplate(final Map<String,Object> args, final PropertyValue template) {
         return  asTemplate(args, template.getValue());
     }
+    */
 
     @SuppressWarnings("unchecked")
     public FlowFileWorker createFlowFile() {
@@ -117,6 +121,44 @@ public class TransformerDelegate extends GroovyObjectSupport {
         return new FlowFileWorker(
                 content?transformer$context.session.clone(transformer$context.flowFile):transformer$context.session.create(transformer$context.flowFile),
                 transformer$context.session, transformer$context.REL_SUCCESS);
+    }
+
+    private Map<String, Class<StreamWritable>> methodsCache = new HashMap<>();
+    /**
+     * method to support external `asXXX` commands implementation. normally called by groovy.
+     * searches for <code>groovyx.acme.nifi.writer.`name`.`Name`</code> class that implements StreamWritable
+     * @param name method name
+     * @param arg arguments provided by caller
+     * @return initialized class instance that implements StreamWritable ready to write output in specific format
+     */
+    @SuppressWarnings("unchecked")
+    public Object methodMissing(String name, Object arg){
+        Object[] args = null;
+
+        if(name==null || name.length()<1) throw new RuntimeException("Unsupported method name: `"+name+"`");
+        if( arg instanceof Object[] )args = (Object[])arg;
+        else throw new RuntimeException("Unsupported argument list: "+arg+" for `"+name+"`");
+
+        Class<StreamWritable> methodClass = methodsCache.get(name);
+        if(methodClass==null) {
+            String className = "groovyx.acme.nifi.writer." + name + "." + Character.toUpperCase(name.charAt(0)) + name.substring(1);
+            try {
+                methodClass = (Class<StreamWritable>) this.getClass().getClassLoader().loadClass(className);
+            } catch (Throwable e) {
+                MissingMethodException me = new MissingMethodException( name, this.getClass(), args );
+                throw new RuntimeException(me.getMessage(),e);
+            }
+            methodsCache.put(name,methodClass);
+        }
+
+        StreamWritable writable = null;
+        try {
+            writable = methodClass.newInstance();
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to instantiate "+methodClass,e);
+        }
+        writable.init(args);
+        return writable;
     }
 
 }

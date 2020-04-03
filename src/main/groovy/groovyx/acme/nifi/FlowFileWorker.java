@@ -271,9 +271,10 @@ public class FlowFileWorker {
     @SuppressWarnings("unchecked")
     public Object methodMissing(String name, Object arg){
         Object[] args = null;
+
+        if(name==null || name.length()<1) throw new RuntimeException("Unsupported method name: `"+name+"`");
         if( arg instanceof Object[] )args = (Object[])arg;
         else throw new RuntimeException("Unsupported argument list: "+arg+" for `"+name+"`");
-        if(name==null || name.length()<1) throw new RuntimeException("Unsupported method: `"+arg+"`");
 
         Class<ParseTransformWriteContext> methodClass = methodsCache.get(name);
         if(methodClass==null) {
