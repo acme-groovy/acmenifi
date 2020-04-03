@@ -11,7 +11,7 @@ there are two ways of usage
 ### grab it directly from your groovy script
 
 ```groovy
-@Grab(group='acme.groovy', module='acmenifi', version='20190218', transitive=false)
+@Grab(group='acme.groovy', module='acmenifi', version='20.04.03', transitive=false)
 import static groovyx.acme.nifi.AcmeNiFi.*
 ```
 
